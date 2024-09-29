@@ -9,19 +9,20 @@ class TestTasks(http.Controller):
     @http.route('/test_tasks/courier', type='http', methods=['GET'], auth='public')
     def courier_info(self, **kw):
         try:
-            courier_id = kw.get('courier_id')
+            courier_id = int(kw.get('courier_id')) if kw.get('courier_id') else 0
             date_str = kw.get('date')
             if date_str:
-                date = datetime.strptime(date_str, '%Y-%m-%d').date()
+                day = datetime.strptime(date_str, '%Y-%m-%d').date() # date зарезервированное имя, конечно можно назвать так переменную, но лучше использовать уникальные наименования
+                # Желательнг использовать fields.Datetime.from_string()
             else:
-                date = datetime.today()
+                day = datetime.today()
 
-            day_start = date.strftime('%Y-%m-%d 00:00:00')
-            day_end = date.strftime('%Y-%m-%d 23:59:59')
-            orders_domain = [('delivery_partner_id', '=', int(courier_id)),
+            day_start = day.strftime('%Y-%m-%d 00:00:00') 
+            day_end = day.strftime('%Y-%m-%d 23:59:59')
+            orders_domain = [('delivery_partner_id', '=', courier_id),
                              ('date_order', '>=', day_start),
                              ('date_order', '<=', day_end)]
-            courier_info = http.request.env['res.partner'].sudo().search([('id', '=', int(courier_id))], limit=1)
+            courier_info = http.request.env['res.partner'].sudo().browse(courier_id) # В данном случае мы имеем id курьера, поиск по id быстрее выполняет browse(), да и формулировка лаконичнее :)
             orders = http.request.env['sale.order'].sudo().search(orders_domain)
 
             orders_list = []
@@ -34,6 +35,7 @@ class TestTasks(http.Controller):
                         'client_phone': order.partner_id.phone,
                         'delivery_address': order.partner_id.contact_address,
                         # TODO: where is delivery state?
+                        # Мой провтык, не углядел , спасибо что подметил :)
                         'delivery_status': 'Delivered' if order.commitment_date else 'Awaiting delivery'
                     }
                 )
@@ -59,17 +61,3 @@ class TestTasks(http.Controller):
                 headers=[('Content-Type', 'application/json')],
                 status=500
             )
-
-
-#     @http.route('/test_tasks/test_tasks/objects', auth='public')
-#     def list(self, **kw):
-#         return http.request.render('test_tasks.listing', {
-#             'root': '/test_tasks/test_tasks',
-#             'objects': http.request.env['test_tasks.test_tasks'].search([]),
-#         })
-
-#     @http.route('/test_tasks/test_tasks/objects/<model("test_tasks.test_tasks"):obj>', auth='public')
-#     def object(self, obj, **kw):
-#         return http.request.render('test_tasks.object', {
-#             'object': obj
-#         })
